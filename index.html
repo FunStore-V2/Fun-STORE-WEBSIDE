@@ -88,7 +88,7 @@
             <button onclick="processOrder()" class="w-full bg-orange-600 text-white py-4 rounded-2xl font-black uppercase transition shadow-lg active:scale-95 hover:bg-orange-700">Bayar via Saweria</button>
             <div class="mt-6 bg-gray-100 p-4 rounded-2xl border-2 border-dashed border-gray-300">
                 <p class="text-[11px] text-gray-700 font-bold uppercase leading-tight">
-                    ⚠️ Nama Produk sudah disalin!<br>Nanti Klik Tahan & <span class="text-orange-600 underline">PASTE / TEMPEL</span> di kolom "Pesan" Saweria.
+                    ⚠️ Nama & Order ID otomatis terisi!<br>Cukup klik bayar dan selesaikan transaksi.
                 </p>
             </div>
             <button onclick="closeModal()" class="mt-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Batal</button>
@@ -237,12 +237,11 @@
 
             totalLabel.innerText = total.toLocaleString('id-ID');
 
-            // --- LOGIKA MINIMAL 2.000 ---
             if (cart.length === 0) {
                 container.innerHTML = `<p class="text-center opacity-30 mt-20 text-white font-bold uppercase tracking-widest">Kosong</p>`;
                 btn.disabled = true;
                 minWarn.classList.add('hidden');
-            } else if (total < 2000) { // Batas minimal diubah ke 2.000
+            } else if (total < 2000) {
                 btn.disabled = true;
                 minWarn.classList.remove('hidden');
             } else {
@@ -257,42 +256,48 @@
             document.getElementById('qrisModal').classList.remove('hidden');
         }
 
+        // --- FUNGSI PROSES BAYAR TERBARU ---
         async function processOrder() {
             let total = cart.reduce((sum, item) => sum + item.price, 0);
             let productNames = cart.map(item => item.name).join(', ');
-            let productListLog = cart.map((item, i) => `${i + 1}. **${item.name}**`).join('\n');
+            
+            // Membuat Order ID unik pendek (Contoh: FUN-X7A2B)
+            let orderID = "FUN-" + Math.random().toString(36).substring(2, 7).toUpperCase();
 
-            // --- AUTO COPY PESAN ---
-            const textToCopy = `Order: ${productNames} | User: ${currentUser}`;
+            // 1. Auto-fill Link Saweria (Nama & Pesan otomatis terisi)
+            const finalSaweriaURL = `${SAWERIA_LINK}?name=${encodeURIComponent(currentUser)}&msg=${encodeURIComponent(orderID + " | " + productNames)}`;
+
+            // 2. Salin info ke clipboard (sebagai cadangan)
+            const textToCopy = `${orderID} | ${productNames}`;
             try {
                 await navigator.clipboard.writeText(textToCopy);
-                
-                const payload = {
-                    username: "Fun Store Log",
-                    embeds: [{
-                        title: "🚀 Menunggu Pembayaran",
-                        color: 16753920,
-                        fields: [
-                            { name: "👤 User Discord", value: `**${currentUser}**`, inline: true },
-                            { name: "💵 Total Tagihan", value: `**Rp ${total.toLocaleString('id-ID')}**`, inline: true },
-                            { name: "📋 Item", value: productListLog }
-                        ],
-                        timestamp: new Date()
-                    }]
-                };
+            } catch(e) { console.log("Gagal menyalin"); }
 
-                await fetch(DISCORD_WEBHOOK_URL, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload) 
-                });
+            // 3. BUKA LINK SAWERIA
+            window.open(finalSaweriaURL, '_blank');
 
-                alert(`SIAP BAYAR!\n\n1. Nominal: Rp ${total.toLocaleString('id-ID')}\n2. Pesan: SUDAH DISALIN!\n\nKlik OK, lalu klik tahan & PASTE di kolom pesan Saweria.`);
-                
-                window.open(SAWERIA_LINK, '_blank');
-            } catch(e) {
-                window.open(SAWERIA_LINK, '_blank');
-            }
+            // 4. Kirim Payload ke Discord
+            const payloadPending = {
+                username: "Fun Store Log",
+                embeds: [{
+                    title: "💳 Menunggu Pembayaran",
+                    color: 16753920,
+                    fields: [
+                        { name: "Buyer", value: `\`@${currentUser}\``, inline: true },
+                        { name: "Status", value: "🟡 **Pending**", inline: true },
+                        { name: "Produk", value: `\`\`\`${productNames}\`\`\`` },
+                        { name: "Order ID", value: `\`\`\`${orderID}\`\`\`` }
+                    ],
+                    footer: { text: `Total Tagihan: Rp ${total.toLocaleString('id-ID')}` },
+                    timestamp: new Date()
+                }]
+            };
+
+            fetch(DISCORD_WEBHOOK_URL, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payloadPending) 
+            }).catch(e => console.error(e));
             
             closeModal();
         }
