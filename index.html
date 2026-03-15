@@ -50,11 +50,12 @@
         </div>
         <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
         <div class="p-8 border-t border-gray-800 bg-[#161b22]">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex justify-between items-center mb-2">
                 <span class="text-gray-400 font-bold uppercase text-xs">Total Pembayaran</span>
                 <span class="text-3xl font-black text-blue-500">Rp <span id="cart-total">0</span></span>
             </div>
-            <button onclick="checkoutQRIS()" id="btn-checkout" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black uppercase text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed" disabled>Bayar Sekarang</button>
+            <p id="min-warning" class="text-[10px] text-red-500 font-bold uppercase mb-4 hidden text-center">Minimal pembayaran Rp 2.000</p>
+            <button onclick="checkoutSaweria()" id="btn-checkout" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black uppercase text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed" disabled>Lanjut Pembayaran</button>
         </div>
     </div>
 
@@ -77,27 +78,27 @@
     </div>
 
     <div id="qrisModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
-        <div class="bg-white text-black p-8 rounded-[2.5rem] text-center w-full max-w-[450px] shadow-2xl border-4 border-blue-500">
-            <h2 class="text-xl font-black text-blue-600 uppercase mb-2 tracking-tighter">Pembayaran Transfer</h2>
-            <p class="text-[10px] text-red-500 font-bold mb-6 italic uppercase">QRIS Sedang Bermasalah - Gunakan Transfer DANA</p>
-            <div class="bg-blue-50 p-6 rounded-3xl mb-6 shadow-inner border border-blue-100">
-                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Nomor DANA Admin</p>
-                <p class="text-3xl font-black text-blue-600 mb-1 tracking-widest">0812-4329-8083</p>
-                <p class="text-[9px] font-bold text-gray-400 uppercase">A.N FUN STORE PAYMENT</p>
+        <div class="bg-white text-black p-8 rounded-[2.5rem] text-center w-full max-w-[450px] shadow-2xl border-4 border-orange-500">
+            <h2 class="text-xl font-black text-orange-600 uppercase mb-2 tracking-tighter">Pembayaran Saweria</h2>
+            <p class="text-[10px] text-gray-500 font-bold mb-6 italic uppercase">Mendukung: QRIS, Gopey, OVO, Dana, LinkAja</p>
+            <div class="bg-orange-50 p-6 rounded-3xl mb-6 shadow-inner border border-orange-100">
+                <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Total Wajib Bayar</p>
+                <p id="qrisAmountDisplay" class="text-4xl font-black text-orange-600"></p>
             </div>
-            <div class="mb-8">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Wajib Bayar</p>
-                <p id="qrisAmountDisplay" class="text-4xl font-black text-blue-600"></p>
+            <button onclick="processOrder()" class="w-full bg-orange-600 text-white py-4 rounded-2xl font-black uppercase transition shadow-lg active:scale-95 hover:bg-orange-700">Bayar via Saweria</button>
+            <div class="mt-6 bg-gray-100 p-4 rounded-2xl border-2 border-dashed border-gray-300">
+                <p class="text-[11px] text-gray-700 font-bold uppercase leading-tight">
+                    ⚠️ Nama Produk sudah disalin!<br>Nanti Klik Tahan & <span class="text-orange-600 underline">PASTE / TEMPEL</span> di kolom "Pesan" Saweria.
+                </p>
             </div>
-            <button onclick="sendToDiscordAndClose()" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase transition shadow-lg active:scale-95 hover:bg-blue-700">Konfirmasi Transfer</button>
-            <p class="text-[10px] text-gray-400 mt-6 uppercase font-bold px-4 leading-relaxed">Silakan transfer sesuai nominal, lalu klik konfirmasi. Simpan bukti TF untuk divalidasi Admin di Discord.</p>
+            <button onclick="closeModal()" class="mt-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Batal</button>
         </div>
     </div>
 
     <script>
-        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1481533708589731950/r03fDu241COpL_je5Px0bTqPkBXGk1-xvy4OqvwdY1TXeecMi-SUjey6mGPH-b876xen";
-        
-        // DATA PRODUK
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1482684511467864169/fk4ZhsotPFEAsw6agUoWIksbucKnt8vLwrqUiZHYluxdi0W5UIC6bpEh_3sCpjF_Hka_";
+        const SAWERIA_LINK = "https://saweria.co/V4nnTory";
+
         let products = [
             { id: 'P1', name: 'Fun Optimized', price: 55000, stock: 100, img: 'Screenshot 2026-03-12 103240.png', type: 'normal' },
             { id: 'P2', name: 'Fun ROCKSTAR Private', price: 18000, stock: 42, img: 'https://th.bing.com/th/id/OIP.sXDeAcH11e8v-PzIN8t9VQHaEK?w=281&h=180&c=7&rs=1', type: 'normal' },
@@ -119,33 +120,25 @@
             const grid = document.getElementById('product-grid');
             if(!grid) return;
             grid.innerHTML = '';
-
             products.forEach(p => {
                 let isOutOfStock = p.stock <= 0;
                 let btnDisable = isOutOfStock ? 'disabled opacity-30 cursor-not-allowed' : '';
                 let stockLabel = isOutOfStock ? '<span class="text-red-500">Habis</span>' : `<span class="text-blue-400">${p.stock} Unit</span>`;
-                
                 let cardHTML = `<div class="card p-5 rounded-3xl flex flex-col">
                     <img src="${p.img}" class="w-full h-64 ${p.id.startsWith('P7') || p.id === 'P8' || p.id === 'P9' || p.id === 'P10' ? 'object-contain p-8' : 'object-cover'} rounded-2xl mb-5 bg-gray-800/30">
                     <h3 class="font-extrabold text-xl mb-1 text-white uppercase">${p.name}</h3>`;
-
                 if(p.type === 'normal') {
-                    cardHTML += `
-                        <p class="text-3xl font-black text-blue-500 mb-0">Rp${p.price.toLocaleString('id-ID')}</p>
+                    cardHTML += `<p class="text-3xl font-black text-blue-500 mb-0">Rp${p.price.toLocaleString('id-ID')}</p>
                         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6">Tersedia: ${stockLabel}</p>
-                        <button onclick="addToCart('${p.id}', '${p.name}', ${p.price})" ${btnDisable} class="w-full bg-blue-600 py-4 rounded-xl font-black text-white uppercase transition mt-auto hover:bg-blue-500">
-                            ${isOutOfStock ? 'Stok Habis' : '+ Keranjang'}
-                        </button>`;
+                        <button onclick="addToCart('${p.id}', '${p.name}', ${p.price})" ${btnDisable} class="w-full bg-blue-600 py-4 rounded-xl font-black text-white uppercase transition mt-auto hover:bg-blue-500">${isOutOfStock ? 'Stok Habis' : '+ Keranjang'}</button>`;
                 } else if(p.type === 'cheat') {
-                    cardHTML += `
-                        <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
+                    cardHTML += `<p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
                         <div class="grid grid-cols-2 gap-2 mt-auto">
                             <button onclick="addToCart('${p.ids[0]}', '${p.name} (1moon)', ${p.prices[0]})" ${btnDisable} class="bg-blue-600 py-3 rounded-lg font-bold text-[10px] text-white uppercase">1 Bulan<br>Rp${p.prices[0]/1000}k</button>
                             <button onclick="addToCart('${p.ids[1]}', '${p.name} (Lifetime)', ${p.prices[1]})" ${btnDisable} class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] text-white uppercase">Lifetime<br>Rp${p.prices[1]/1000}k</button>
                         </div>`;
                 } else if(p.type === 'cheat_multi') {
-                    cardHTML += `
-                        <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
+                    cardHTML += `<p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
                         <div class="grid grid-cols-2 gap-2 mt-auto">
                             <button onclick="addToCart('P5a', 'Keyser (1 day)', 125000)" ${btnDisable} class="bg-blue-600 py-3 rounded-lg font-bold text-[10px] text-white uppercase">1 Bulan<br>Rp125k</button>
                             <button onclick="addToCart('P5b', 'Keyser (1 week)', 225000)" ${btnDisable} class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] text-white uppercase">1 week<br>Rp225k</button>
@@ -153,8 +146,7 @@
                             <button onclick="addToCart('P5d', 'Keyser (lifetime)', 720000)" ${btnDisable} class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] text-white uppercase">Lifetime<br>Rp720k</button>
                         </div>`;
                 } else if(p.type === 'cheat_triple') {
-                    cardHTML += `
-                        <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
+                    cardHTML += `<p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Tersedia: ${stockLabel}</p>
                         <div class="grid grid-cols-3 gap-2 mt-auto">
                             <button onclick="addToCart('${p.id}a', '${p.name} (7 Day)', 130000)" ${btnDisable} class="bg-blue-600 py-3 rounded-lg font-bold text-[9px] text-white uppercase text-center leading-tight">7 Days<br>Rp130k</button>
                             <button onclick="addToCart('${p.id}b', '${p.name} (30 Day)', 230000)" ${btnDisable} class="bg-indigo-600 py-3 rounded-lg font-bold text-[9px] text-white uppercase text-center leading-tight">30 Days<br>Rp230kk</button>
@@ -171,7 +163,6 @@
             const warning = document.getElementById('login-warning');
             const userDisplay = document.getElementById('user-display');
             const loginBtn = document.getElementById('login-btn');
-            
             if (currentUser) {
                 if(container) container.classList.remove('login-locked');
                 if(warning) warning.classList.add('hidden');
@@ -188,7 +179,6 @@
         }
 
         function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
-        
         function doLogin() {
             const val = document.getElementById('username-input').value;
             if (val.length < 3) return alert("Nama tidak valid");
@@ -197,7 +187,6 @@
             document.getElementById('loginModal').classList.add('hidden');
             checkAuth();
         }
-
         function doLogout() {
             localStorage.removeItem('funstore_user');
             currentUser = null;
@@ -216,24 +205,15 @@
         }
 
         function addToCart(id, name, price) {
-            const baseId = id.substring(0, 3).replace(/[a-z]/g, ''); 
-            const product = products.find(p => p.id === id || p.id === id.substring(0,3) || p.id === id.substring(0,2));
-            
-            if(product && product.stock > 0) {
-                cart.push({ id, name, price });
-                saveCart();
-                updateCartUI();
-            } else {
-                alert("Stok Habis!");
-            }
+            cart.push({ id, name, price });
+            saveCart();
+            updateCartUI();
         }
-
         function removeFromCart(index) {
             cart.splice(index, 1);
             saveCart();
             updateCartUI();
         }
-
         function saveCart() { localStorage.setItem('funstore_cart', JSON.stringify(cart)); }
 
         function updateCartUI() {
@@ -241,64 +221,79 @@
             const totalLabel = document.getElementById('cart-total');
             const countLabel = document.getElementById('cart-count');
             const btn = document.getElementById('btn-checkout');
+            const minWarn = document.getElementById('min-warning');
             if(!container) return;
-            
             countLabel.innerText = cart.length;
             container.innerHTML = '';
             let total = 0;
             
+            cart.forEach((item, index) => {
+                total += item.price;
+                container.innerHTML += `<div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-800 flex justify-between items-center text-white">
+                    <div><p class="font-bold text-sm uppercase">${item.name}</p><p class="text-blue-400 text-xs font-bold">Rp ${item.price.toLocaleString('id-ID')}</p></div>
+                    <button onclick="removeFromCart(${index})" class="text-red-500 font-bold">✕</button>
+                </div>`;
+            });
+
+            totalLabel.innerText = total.toLocaleString('id-ID');
+
+            // --- LOGIKA MINIMAL 2.000 ---
             if (cart.length === 0) {
                 container.innerHTML = `<p class="text-center opacity-30 mt-20 text-white font-bold uppercase tracking-widest">Kosong</p>`;
                 btn.disabled = true;
-            } else { 
-                btn.disabled = false; 
+                minWarn.classList.add('hidden');
+            } else if (total < 2000) { // Batas minimal diubah ke 2.000
+                btn.disabled = true;
+                minWarn.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                minWarn.classList.add('hidden');
             }
-
-            cart.forEach((item, index) => {
-                total += item.price;
-                container.innerHTML += `
-                    <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-800 flex justify-between items-center text-white">
-                        <div><p class="font-bold text-sm uppercase">${item.name}</p><p class="text-blue-400 text-xs font-bold">Rp ${item.price.toLocaleString('id-ID')}</p></div>
-                        <button onclick="removeFromCart(${index})" class="text-red-500 font-bold">✕</button>
-                    </div>`;
-            });
-            totalLabel.innerText = total.toLocaleString('id-ID');
         }
 
-        function checkoutQRIS() {
+        function checkoutSaweria() {
             let total = cart.reduce((sum, item) => sum + item.price, 0);
             document.getElementById('qrisAmountDisplay').innerText = "Rp" + total.toLocaleString('id-ID');
             document.getElementById('qrisModal').classList.remove('hidden');
         }
 
-        async function sendToDiscordAndClose() {
-            cart.forEach(item => {
-                const baseId = item.id.substring(0, 3).match(/P\d+/)[0];
-                const product = products.find(p => p.id === baseId);
-                if(product && product.stock > 0) product.stock -= 1;
-            });
-            renderProducts();
-
+        async function processOrder() {
             let total = cart.reduce((sum, item) => sum + item.price, 0);
-            let productList = cart.map((item, i) => `${i + 1}. **${item.name}**`).join('\n');
-            const payload = {
-                username: "Fun Store Log",
-                embeds: [{
-                    title: "🛒 ADMIN SEDANG MEMERIKSA PESANAN MU ( LOG VIA DANA)",
-                    color: 3447003,
-                    fields: [
-                        { name: "👤 User", value: `**${currentUser}**`, inline: true },
-                        { name: "💵 Total", value: `**Rp ${total.toLocaleString('id-ID')}**`, inline: true },
-                        { name: "📋 Item", value: productList }
-                    ]
-                }]
-            };
+            let productNames = cart.map(item => item.name).join(', ');
+            let productListLog = cart.map((item, i) => `${i + 1}. **${item.name}**`).join('\n');
+
+            // --- AUTO COPY PESAN ---
+            const textToCopy = `Order: ${productNames} | User: ${currentUser}`;
             try {
-                await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                alert("Pesanan terkirim!");
+                await navigator.clipboard.writeText(textToCopy);
+                
+                const payload = {
+                    username: "Fun Store Log",
+                    embeds: [{
+                        title: "🚀 Menunggu Pembayaran",
+                        color: 16753920,
+                        fields: [
+                            { name: "👤 User Discord", value: `**${currentUser}**`, inline: true },
+                            { name: "💵 Total Tagihan", value: `**Rp ${total.toLocaleString('id-ID')}**`, inline: true },
+                            { name: "📋 Item", value: productListLog }
+                        ],
+                        timestamp: new Date()
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload) 
+                });
+
+                alert(`SIAP BAYAR!\n\n1. Nominal: Rp ${total.toLocaleString('id-ID')}\n2. Pesan: SUDAH DISALIN!\n\nKlik OK, lalu klik tahan & PASTE di kolom pesan Saweria.`);
+                
+                window.open(SAWERIA_LINK, '_blank');
             } catch(e) {
-                alert("Gagal kirim log, tapi pesanan dicatat!");
+                window.open(SAWERIA_LINK, '_blank');
             }
+            
             closeModal();
         }
 
